@@ -1,0 +1,8 @@
+{
+  "rho": -0.01816191404426351,
+  "n_partidos": 2232,
+  "log_loss_modelo": 0.8673984508721365,
+  "accuracy_modelo": 0.6008064516129032,
+  "log_loss_baseline_frecuencias": 1.0543090314981147,
+  "accuracy_baseline_elo": 0.6012544802867383
+}
