@@ -275,7 +275,9 @@ with tab_grupos:
         axis=1,
     )
     df_filtrado["marcador_real"] = df_filtrado.apply(
-        lambda r: f"{int(r['goles_local_real'])}-{int(r['goles_visita_real'])}" if r["resultado_real"] is not None else None,
+        lambda r: f"{int(r['goles_local_real'])}-{int(r['goles_visita_real'])}"
+        if pd.notna(r["goles_local_real"]) and pd.notna(r["goles_visita_real"])
+        else None,
         axis=1,
     )
     df_filtrado["acierto_marcador"] = df_filtrado.apply(
