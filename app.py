@@ -309,7 +309,7 @@ with tab_grupos:
         "goles_esperados_local", "goles_esperados_visita", "goles_esperados_total",
         "prob_victoria_local", "prob_empate", "prob_victoria_visita",
         "marcador_mas_probable", "prediccion_modelo",
-        "goles_local_real", "goles_visita_real", "resultado_real", "acierto",
+        "resultado_real", "acierto",
         "marcador_real", "acierto_marcador",
     ]
 
@@ -321,7 +321,6 @@ with tab_grupos:
         "goles_esperados_total": "xG Total",
         "prob_victoria_local": "P(Local)", "prob_empate": "P(Empate)", "prob_victoria_visita": "P(Visita)",
         "marcador_mas_probable": "Marcador más probable", "prediccion_modelo": "Predicción modelo",
-        "goles_local_real": "Goles Local (real)", "goles_visita_real": "Goles Visita (real)",
         "resultado_real": "Resultado real", "acierto": "¿Acierto V/E/D?",
         "marcador_real": "Marcador real", "acierto_marcador": "¿Acierto marcador?",
     })
@@ -330,7 +329,6 @@ with tab_grupos:
         tabla_mostrar.style.format({
             "xG Local": "{:.2f}", "xG Visita": "{:.2f}", "xG Total": "{:.2f}",
             "P(Local)": "{:.1%}", "P(Empate)": "{:.1%}", "P(Visita)": "{:.1%}",
-            "Goles Local (real)": "{:.0f}", "Goles Visita (real)": "{:.0f}",
         }, na_rep=""),
         column_config={
             "🏳️ L": st.column_config.ImageColumn("🏳️ L", width="small"),
