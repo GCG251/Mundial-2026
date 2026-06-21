@@ -11,6 +11,7 @@ Ejecutar con:
     streamlit run app.py
 """
 
+import math
 import subprocess
 import sys
 import time
@@ -300,23 +301,16 @@ with tab_grupos:
         axis=1,
     )
 
-    umbral_ou = st.radio(
-        "Línea Over/Under",
-        [1.5, 2.5, 3.5],
-        index=1,
-        horizontal=True,
-        format_func=lambda x: f"O/U {x}",
+    # La línea O/U se deriva automáticamente del xG Total del modelo:
+    # si el modelo predice N goles → pronostica "Over N-0.5"
+    # (ej: xG=2.0 → Over 1.5; xG=3.1 → Over 2.5).
+    df_filtrado["linea_ou"] = df_filtrado["goles_esperados_total"].apply(
+        lambda x: math.floor(x + 0.5) - 0.5
     )
-
-    df_filtrado["pred_ou"] = df_filtrado["goles_esperados_total"].apply(
-        lambda x: f"Over {umbral_ou}" if x > umbral_ou else f"Under {umbral_ou}"
-    )
-    df_filtrado["real_ou"] = df_filtrado["goles_total_real"].apply(
-        lambda x: (f"Over {umbral_ou}" if x > umbral_ou else f"Under {umbral_ou}")
-        if x is not None else None
-    )
+    df_filtrado["pred_ou"] = df_filtrado["linea_ou"].apply(lambda x: f"Over {x:.1f}")
     df_filtrado["acierto_ou"] = df_filtrado.apply(
-        lambda r: (r["pred_ou"] == r["real_ou"]) if r["real_ou"] is not None else None,
+        lambda r: bool(r["goles_total_real"] > r["linea_ou"])
+        if r["goles_total_real"] is not None else None,
         axis=1,
     )
     aciertos_ou = df_filtrado["acierto_ou"].sum()
@@ -327,7 +321,7 @@ with tab_grupos:
     c2.metric("Aciertos del modelo (V/E/D)", int(aciertos) if jugados else 0)
     c3.metric("% de acierto (V/E/D)", f"{aciertos / jugados * 100:.1f}%" if jugados else "—")
     c4.metric("% de acierto (marcador exacto)", f"{aciertos_marcador / jugados * 100:.1f}%" if jugados else "—")
-    c5.metric(f"% acierto O/U {umbral_ou}", f"{aciertos_ou / jugados * 100:.1f}%" if jugados else "—")
+    c5.metric("% acierto O/U goles", f"{aciertos_ou / jugados * 100:.1f}%" if jugados else "—")
 
     st.subheader("Calendario y predicciones")
 
@@ -355,8 +349,8 @@ with tab_grupos:
         "marcador_mas_probable": "Marcador más probable", "prediccion_modelo": "Predicción modelo",
         "resultado_real": "Resultado real", "acierto": "¿Acierto V/E/D?",
         "marcador_real": "Marcador real", "acierto_marcador": "¿Acierto marcador?",
-        "pred_ou": f"Pred O/U {umbral_ou}", "goles_total_real": "Total goles real",
-        "acierto_ou": f"¿Acierto O/U {umbral_ou}?",
+        "pred_ou": "Pred O/U", "goles_total_real": "Total goles real",
+        "acierto_ou": "¿Acierto O/U?",
     })
 
     st.dataframe(
