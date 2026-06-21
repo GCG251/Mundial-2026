@@ -49,6 +49,8 @@ SEMILLA = 42
 GRUPOS = list("ABCDEFGHIJKL")
 RONDAS_ELIMINATORIA = ["llega_8vos", "llega_4tos", "llega_semis", "llega_final", "campeon"]
 
+HOST_NATIONS = {"United States", "Canada", "Mexico"}
+
 
 # ----------------------------------------------------------------------------
 # Carga de datos y preparación
@@ -126,7 +128,7 @@ def calcular_lambdas(equipos_mundial: list[str], estado: pd.DataFrame, modelo) -
                 "forma_dif_gol_rival": fr["forma_dif_gol"],
                 "gf_prom_propio": fp["gf_prom"],
                 "gc_prom_rival": fr["gc_prom"],
-                "es_local": 0,  # todos los partidos del Mundial se tratan como cancha neutral
+                "es_local": 1 if propio in HOST_NATIONS else 0,
             })
             pares.append((propio, rival))
 

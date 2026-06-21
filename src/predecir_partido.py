@@ -41,6 +41,9 @@ RUTA_SALIDA_GRUPOS = OUTPUT_DIR / "predicciones_fase_grupos.csv"
 
 TOP_MARCADORES = 5  # cantidad de marcadores más probables a reportar
 
+# Selecciones anfitrionas que juegan con ventaja de local en todo el torneo.
+HOST_NATIONS = {"United States", "Canada", "Mexico"}
+
 
 # ----------------------------------------------------------------------------
 # Carga de recursos
@@ -88,10 +91,13 @@ def predecir_partido(equipo_local: str, equipo_visita: str, estado: pd.DataFrame
     Si `neutral=False`, se le da al equipo local la ventaja de jugar en casa
     (tal como se modeló en la Fase 2 con la variable `es_local`).
     """
-    es_local_flag = 0 if neutral else 1
+    # Las selecciones anfitrionas (USA, Canadá, México) siempre juegan con
+    # ventaja de local, independientemente del flag neutral.
+    es_local_flag = 1 if equipo_local in HOST_NATIONS else (0 if neutral else 1)
+    es_visita_flag = 1 if equipo_visita in HOST_NATIONS else 0
 
     lam = calcular_lambda(equipo_local, equipo_visita, estado, modelo, es_local=es_local_flag)
-    mu = calcular_lambda(equipo_visita, equipo_local, estado, modelo, es_local=0)
+    mu = calcular_lambda(equipo_visita, equipo_local, estado, modelo, es_local=es_visita_flag)
 
     matriz = matriz_resultado(lam, mu, rho)
     p_local, p_empate, p_visita = probabilidades_resultado(matriz)
