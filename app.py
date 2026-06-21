@@ -289,19 +289,50 @@ with tab_grupos:
     aciertos = df_filtrado["acierto"].sum()
     aciertos_marcador = df_filtrado["acierto_marcador"].sum()
 
-    c1, c2, c3, c4 = st.columns(4)
+    # --- Over/Under -----------------------------------------------------------
+    df_filtrado["goles_esperados_total"] = (
+        df_filtrado["goles_esperados_local"] + df_filtrado["goles_esperados_visita"]
+    )
+    df_filtrado["goles_total_real"] = df_filtrado.apply(
+        lambda r: int(r["goles_local_real"]) + int(r["goles_visita_real"])
+        if pd.notna(r["goles_local_real"]) and pd.notna(r["goles_visita_real"])
+        else None,
+        axis=1,
+    )
+
+    umbral_ou = st.radio(
+        "Línea Over/Under",
+        [1.5, 2.5, 3.5],
+        index=1,
+        horizontal=True,
+        format_func=lambda x: f"O/U {x}",
+    )
+
+    df_filtrado["pred_ou"] = df_filtrado["goles_esperados_total"].apply(
+        lambda x: f"Over {umbral_ou}" if x > umbral_ou else f"Under {umbral_ou}"
+    )
+    df_filtrado["real_ou"] = df_filtrado["goles_total_real"].apply(
+        lambda x: (f"Over {umbral_ou}" if x > umbral_ou else f"Under {umbral_ou}")
+        if x is not None else None
+    )
+    df_filtrado["acierto_ou"] = df_filtrado.apply(
+        lambda r: (r["pred_ou"] == r["real_ou"]) if r["real_ou"] is not None else None,
+        axis=1,
+    )
+    aciertos_ou = df_filtrado["acierto_ou"].sum()
+
+    # --- Métricas -------------------------------------------------------------
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Partidos con resultado", f"{jugados} / {len(df_filtrado)}")
     c2.metric("Aciertos del modelo (V/E/D)", int(aciertos) if jugados else 0)
     c3.metric("% de acierto (V/E/D)", f"{aciertos / jugados * 100:.1f}%" if jugados else "—")
     c4.metric("% de acierto (marcador exacto)", f"{aciertos_marcador / jugados * 100:.1f}%" if jugados else "—")
+    c5.metric(f"% acierto O/U {umbral_ou}", f"{aciertos_ou / jugados * 100:.1f}%" if jugados else "—")
 
     st.subheader("Calendario y predicciones")
 
     df_filtrado["bandera_local"] = df_filtrado["equipo_local"].map(bandera)
     df_filtrado["bandera_visita"] = df_filtrado["equipo_visita"].map(bandera)
-    df_filtrado["goles_esperados_total"] = (
-        df_filtrado["goles_esperados_local"] + df_filtrado["goles_esperados_visita"]
-    )
 
     columnas_mostrar = [
         "fecha", "jornada", "grupo",
@@ -311,6 +342,7 @@ with tab_grupos:
         "marcador_mas_probable", "prediccion_modelo",
         "resultado_real", "acierto",
         "marcador_real", "acierto_marcador",
+        "pred_ou", "goles_total_real", "acierto_ou",
     ]
 
     tabla_mostrar = df_filtrado[columnas_mostrar].rename(columns={
@@ -323,6 +355,8 @@ with tab_grupos:
         "marcador_mas_probable": "Marcador más probable", "prediccion_modelo": "Predicción modelo",
         "resultado_real": "Resultado real", "acierto": "¿Acierto V/E/D?",
         "marcador_real": "Marcador real", "acierto_marcador": "¿Acierto marcador?",
+        "pred_ou": f"Pred O/U {umbral_ou}", "goles_total_real": "Total goles real",
+        "acierto_ou": f"¿Acierto O/U {umbral_ou}?",
     })
 
     st.dataframe(
