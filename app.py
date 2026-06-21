@@ -357,6 +357,7 @@ with tab_grupos:
         tabla_mostrar.style.format({
             "xG Local": "{:.2f}", "xG Visita": "{:.2f}", "xG Total": "{:.2f}",
             "P(Local)": "{:.1%}", "P(Empate)": "{:.1%}", "P(Visita)": "{:.1%}",
+            "Total goles real": "{:.0f}",
         }, na_rep=""),
         column_config={
             "🏳️ L": st.column_config.ImageColumn("🏳️ L", width="small"),
