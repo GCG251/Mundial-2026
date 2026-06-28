@@ -120,15 +120,92 @@ def resultado_desde_goles(goles_local, goles_visita):
     return "Empate"
 
 
-def prediccion_resultado(fila) -> str:
+def prediccion_resultado(fila) -> str | None:
     """
     Predicción del modelo a partir del marcador más probable (no de las
     probabilidades agregadas de V/E/D, que casi nunca dan "Empate" como
     máximo porque la probabilidad de empate se reparte entre varios
     marcadores 0-0, 1-1, 2-2, etc.).
     """
-    goles_local, goles_visita = fila["marcador_mas_probable"].split("-")
+    marcador = fila["marcador_mas_probable"]
+    if not isinstance(marcador, str):
+        return None  # partido todavía sin predicción (equipos no definidos)
+    goles_local, goles_visita = marcador.split("-")
     return resultado_desde_goles(int(goles_local), int(goles_visita))
+
+
+def _linea_ou(fila) -> float | None:
+    """
+    Línea Over/Under que pronostica el modelo: si la probabilidad de Over 0.5
+    (al menos 1 gol) es menor a 50% (0-0 es el resultado más probable),
+    pronostica "Under 0.5"; si no, usa el xG total redondeado al .5 inferior
+    (ej. xG=2.0 -> línea 1.5, xG=3.1 -> línea 2.5).
+    """
+    total, prob_over = fila["goles_esperados_total"], fila["prob_over_0_5"]
+    if pd.isna(total) or pd.isna(prob_over):
+        return None
+    if prob_over < 0.5:
+        return 0.5
+    return math.floor(total + 0.5) - 0.5
+
+
+def _pred_ou(fila) -> str | None:
+    if pd.isna(fila["linea_ou"]):
+        return None
+    tipo = "Under" if fila["prob_over_0_5"] < 0.5 else "Over"
+    return f"{tipo} {fila['linea_ou']:.1f}"
+
+
+def _acierto_ou(fila) -> bool | None:
+    if pd.isna(fila["linea_ou"]) or pd.isna(fila["goles_total_real"]):
+        return None
+    if fila["prob_over_0_5"] < 0.5:
+        return bool(fila["goles_total_real"] < fila["linea_ou"])
+    return bool(fila["goles_total_real"] > fila["linea_ou"])
+
+
+def calcular_predicciones_y_aciertos(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Agrega las columnas de predicción y acierto del modelo a un DataFrame de
+    partidos (fase de grupos o eliminatoria): resultado_real, prediccion_modelo,
+    acierto, marcador_real, acierto_marcador, goles_esperados_total,
+    goles_total_real, pred_ou, acierto_ou.
+
+    Requiere las columnas: goles_esperados_local, goles_esperados_visita,
+    prob_over_0_5, marcador_mas_probable, goles_local_real, goles_visita_real.
+    """
+    df = df.copy()
+    df["resultado_real"] = df.apply(
+        lambda r: resultado_desde_goles(r["goles_local_real"], r["goles_visita_real"]), axis=1
+    )
+    df["prediccion_modelo"] = df.apply(prediccion_resultado, axis=1)
+    df["acierto"] = df.apply(
+        lambda r: (r["prediccion_modelo"] == r["resultado_real"]) if r["resultado_real"] is not None else None,
+        axis=1,
+    )
+    df["marcador_real"] = df.apply(
+        lambda r: f"{int(r['goles_local_real'])}-{int(r['goles_visita_real'])}"
+        if pd.notna(r["goles_local_real"]) and pd.notna(r["goles_visita_real"])
+        else None,
+        axis=1,
+    )
+    df["acierto_marcador"] = df.apply(
+        lambda r: (r["marcador_mas_probable"] == r["marcador_real"]) if r["resultado_real"] is not None else None,
+        axis=1,
+    )
+
+    df["goles_esperados_total"] = df["goles_esperados_local"] + df["goles_esperados_visita"]
+    df["goles_total_real"] = df.apply(
+        lambda r: int(r["goles_local_real"]) + int(r["goles_visita_real"])
+        if pd.notna(r["goles_local_real"]) and pd.notna(r["goles_visita_real"])
+        else None,
+        axis=1,
+    )
+
+    df["linea_ou"] = df.apply(_linea_ou, axis=1)
+    df["pred_ou"] = df.apply(_pred_ou, axis=1)
+    df["acierto_ou"] = df.apply(_acierto_ou, axis=1)
+    return df
 
 
 # ----------------------------------------------------------------------------
@@ -269,53 +346,11 @@ tab_grupos, tab_final = st.tabs(["📋 Fase de grupos", "🏟️ Fase final"])
 
 # --- Tab 1: Fase de grupos --------------------------------------------------
 with tab_grupos:
-    df_filtrado = df_filtrado.copy()
-    df_filtrado["resultado_real"] = df_filtrado.apply(
-        lambda r: resultado_desde_goles(r["goles_local_real"], r["goles_visita_real"]), axis=1
-    )
-    df_filtrado["prediccion_modelo"] = df_filtrado.apply(prediccion_resultado, axis=1)
-    df_filtrado["acierto"] = df_filtrado.apply(
-        lambda r: (r["prediccion_modelo"] == r["resultado_real"]) if r["resultado_real"] is not None else None,
-        axis=1,
-    )
-    df_filtrado["marcador_real"] = df_filtrado.apply(
-        lambda r: f"{int(r['goles_local_real'])}-{int(r['goles_visita_real'])}"
-        if pd.notna(r["goles_local_real"]) and pd.notna(r["goles_visita_real"])
-        else None,
-        axis=1,
-    )
-    df_filtrado["acierto_marcador"] = df_filtrado.apply(
-        lambda r: (r["marcador_mas_probable"] == r["marcador_real"]) if r["resultado_real"] is not None else None,
-        axis=1,
-    )
+    df_filtrado = calcular_predicciones_y_aciertos(df_filtrado)
 
     jugados = df_filtrado["resultado_real"].notna().sum()
     aciertos = df_filtrado["acierto"].sum()
     aciertos_marcador = df_filtrado["acierto_marcador"].sum()
-
-    # --- Over/Under -----------------------------------------------------------
-    df_filtrado["goles_esperados_total"] = (
-        df_filtrado["goles_esperados_local"] + df_filtrado["goles_esperados_visita"]
-    )
-    df_filtrado["goles_total_real"] = df_filtrado.apply(
-        lambda r: int(r["goles_local_real"]) + int(r["goles_visita_real"])
-        if pd.notna(r["goles_local_real"]) and pd.notna(r["goles_visita_real"])
-        else None,
-        axis=1,
-    )
-
-    # La línea O/U se deriva automáticamente del xG Total del modelo:
-    # si el modelo predice N goles → pronostica "Over N-0.5"
-    # (ej: xG=2.0 → Over 1.5; xG=3.1 → Over 2.5).
-    df_filtrado["linea_ou"] = df_filtrado["goles_esperados_total"].apply(
-        lambda x: math.floor(x + 0.5) - 0.5
-    )
-    df_filtrado["pred_ou"] = df_filtrado["linea_ou"].apply(lambda x: f"Over {x:.1f}")
-    df_filtrado["acierto_ou"] = df_filtrado.apply(
-        lambda r: bool(r["goles_total_real"] > r["linea_ou"])
-        if r["goles_total_real"] is not None else None,
-        axis=1,
-    )
     aciertos_ou = df_filtrado["acierto_ou"].sum()
 
     # --- Métricas -------------------------------------------------------------
@@ -335,7 +370,7 @@ with tab_grupos:
         "fecha", "jornada", "grupo",
         "bandera_local", "equipo_local", "bandera_visita", "equipo_visita",
         "goles_esperados_local", "goles_esperados_visita", "goles_esperados_total",
-        "prob_victoria_local", "prob_empate", "prob_victoria_visita", "prob_over_0_5",
+        "prob_victoria_local", "prob_empate", "prob_victoria_visita",
         "marcador_mas_probable", "prediccion_modelo",
         "resultado_real", "acierto",
         "marcador_real", "acierto_marcador",
@@ -349,7 +384,6 @@ with tab_grupos:
         "goles_esperados_local": "xG Local", "goles_esperados_visita": "xG Visita",
         "goles_esperados_total": "xG Total",
         "prob_victoria_local": "P(Local)", "prob_empate": "P(Empate)", "prob_victoria_visita": "P(Visita)",
-        "prob_over_0_5": "P(Over 0.5)",
         "marcador_mas_probable": "Marcador más probable", "prediccion_modelo": "Predicción modelo",
         "resultado_real": "Resultado real", "acierto": "¿Acierto V/E/D?",
         "marcador_real": "Marcador real", "acierto_marcador": "¿Acierto marcador?",
@@ -361,7 +395,6 @@ with tab_grupos:
         tabla_mostrar.style.format({
             "xG Local": "{:.2f}", "xG Visita": "{:.2f}", "xG Total": "{:.2f}",
             "P(Local)": "{:.1%}", "P(Empate)": "{:.1%}", "P(Visita)": "{:.1%}",
-            "P(Over 0.5)": "{:.1%}",
             "Total goles real": "{:.0f}",
         }, na_rep=""),
         column_config={
@@ -406,9 +439,7 @@ with tab_final:
 
     if RUTA_ELIMINATORIA.exists():
         eliminatoria = pd.read_csv(RUTA_ELIMINATORIA, parse_dates=["fecha"])
-        eliminatoria["goles_esperados_total"] = (
-            eliminatoria["goles_esperados_local"] + eliminatoria["goles_esperados_visita"]
-        )
+        eliminatoria = calcular_predicciones_y_aciertos(eliminatoria)
         eliminatoria["bandera_local"] = eliminatoria["equipo_local"].map(bandera)
         eliminatoria["bandera_visita"] = eliminatoria["equipo_visita"].map(bandera)
 
@@ -421,8 +452,11 @@ with tab_final:
         columnas_elim = [
             "fecha", "bandera_local", "equipo_local", "bandera_visita", "equipo_visita",
             "goles_esperados_local", "goles_esperados_visita", "goles_esperados_total",
-            "prob_victoria_local", "prob_empate", "prob_victoria_visita", "prob_over_0_5",
-            "marcador_mas_probable", "goles_local_real", "goles_visita_real",
+            "prob_victoria_local", "prob_empate", "prob_victoria_visita",
+            "marcador_mas_probable", "prediccion_modelo",
+            "resultado_real", "acierto",
+            "marcador_real", "acierto_marcador",
+            "pred_ou", "goles_total_real", "acierto_ou",
         ]
         nombres_elim = {
             "fecha": "Fecha", "bandera_local": "🏳️ L", "equipo_local": "Local",
@@ -430,8 +464,11 @@ with tab_final:
             "goles_esperados_local": "xG Local", "goles_esperados_visita": "xG Visita",
             "goles_esperados_total": "xG Total",
             "prob_victoria_local": "P(Local)", "prob_empate": "P(Empate)", "prob_victoria_visita": "P(Visita)",
-            "prob_over_0_5": "P(Over 0.5)", "marcador_mas_probable": "Marcador más probable",
-            "goles_local_real": "Goles Local (real)", "goles_visita_real": "Goles Visita (real)",
+            "marcador_mas_probable": "Marcador más probable", "prediccion_modelo": "Predicción modelo",
+            "resultado_real": "Resultado real", "acierto": "¿Acierto V/E/D?",
+            "marcador_real": "Marcador real", "acierto_marcador": "¿Acierto marcador?",
+            "pred_ou": "Pred O/U", "goles_total_real": "Total goles real",
+            "acierto_ou": "¿Acierto O/U?",
         }
 
         for ronda in ORDEN_RONDAS:
@@ -444,8 +481,8 @@ with tab_final:
             st.dataframe(
                 tabla_ronda.style.format({
                     "xG Local": "{:.2f}", "xG Visita": "{:.2f}", "xG Total": "{:.2f}",
-                    "P(Local)": "{:.1%}", "P(Empate)": "{:.1%}", "P(Visita)": "{:.1%}", "P(Over 0.5)": "{:.1%}",
-                    "Goles Local (real)": "{:.0f}", "Goles Visita (real)": "{:.0f}",
+                    "P(Local)": "{:.1%}", "P(Empate)": "{:.1%}", "P(Visita)": "{:.1%}",
+                    "Total goles real": "{:.0f}",
                 }, na_rep=""),
                 column_config={
                     "🏳️ L": st.column_config.ImageColumn("🏳️ L", width="small"),
