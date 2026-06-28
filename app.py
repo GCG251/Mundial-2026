@@ -208,6 +208,21 @@ def calcular_predicciones_y_aciertos(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def mostrar_metricas_modelo(df: pd.DataFrame) -> None:
+    """Muestra las 5 métricas de acierto del modelo (requiere las columnas de calcular_predicciones_y_aciertos)."""
+    jugados = df["resultado_real"].notna().sum()
+    aciertos = df["acierto"].sum()
+    aciertos_marcador = df["acierto_marcador"].sum()
+    aciertos_ou = df["acierto_ou"].sum()
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Partidos con resultado", f"{jugados} / {len(df)}")
+    c2.metric("Aciertos del modelo (V/E/D)", int(aciertos) if jugados else 0)
+    c3.metric("% de acierto (V/E/D)", f"{aciertos / jugados * 100:.1f}%" if jugados else "—")
+    c4.metric("% de acierto (marcador exacto)", f"{aciertos_marcador / jugados * 100:.1f}%" if jugados else "—")
+    c5.metric("% acierto O/U goles", f"{aciertos_ou / jugados * 100:.1f}%" if jugados else "—")
+
+
 # ----------------------------------------------------------------------------
 # Tabla de posiciones de un grupo a partir de resultados reales
 # ----------------------------------------------------------------------------
@@ -347,19 +362,7 @@ tab_grupos, tab_final = st.tabs(["📋 Fase de grupos", "🏟️ Fase final"])
 # --- Tab 1: Fase de grupos --------------------------------------------------
 with tab_grupos:
     df_filtrado = calcular_predicciones_y_aciertos(df_filtrado)
-
-    jugados = df_filtrado["resultado_real"].notna().sum()
-    aciertos = df_filtrado["acierto"].sum()
-    aciertos_marcador = df_filtrado["acierto_marcador"].sum()
-    aciertos_ou = df_filtrado["acierto_ou"].sum()
-
-    # --- Métricas -------------------------------------------------------------
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Partidos con resultado", f"{jugados} / {len(df_filtrado)}")
-    c2.metric("Aciertos del modelo (V/E/D)", int(aciertos) if jugados else 0)
-    c3.metric("% de acierto (V/E/D)", f"{aciertos / jugados * 100:.1f}%" if jugados else "—")
-    c4.metric("% de acierto (marcador exacto)", f"{aciertos_marcador / jugados * 100:.1f}%" if jugados else "—")
-    c5.metric("% acierto O/U goles", f"{aciertos_ou / jugados * 100:.1f}%" if jugados else "—")
+    mostrar_metricas_modelo(df_filtrado)
 
     st.subheader("Calendario y predicciones")
 
@@ -442,6 +445,8 @@ with tab_final:
         eliminatoria = calcular_predicciones_y_aciertos(eliminatoria)
         eliminatoria["bandera_local"] = eliminatoria["equipo_local"].map(bandera)
         eliminatoria["bandera_visita"] = eliminatoria["equipo_visita"].map(bandera)
+
+        mostrar_metricas_modelo(eliminatoria)
 
         st.caption(
             "Cuadro real publicado por FIFA (no es un cruce estimado): los nombres de "
