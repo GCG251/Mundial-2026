@@ -101,6 +101,7 @@ def predecir_partido(equipo_local: str, equipo_visita: str, estado: pd.DataFrame
 
     matriz = matriz_resultado(lam, mu, rho)
     p_local, p_empate, p_visita = probabilidades_resultado(matriz)
+    prob_over_0_5 = 1.0 - float(matriz[0, 0])  # P(al menos 1 gol en el partido)
 
     orden = np.dstack(np.unravel_index(np.argsort(-matriz.ravel()), matriz.shape))[0]
     marcadores_probables = [
@@ -113,6 +114,7 @@ def predecir_partido(equipo_local: str, equipo_visita: str, estado: pd.DataFrame
         "equipo_visita": equipo_visita,
         "goles_esperados_local": lam,
         "goles_esperados_visita": mu,
+        "prob_over_0_5": prob_over_0_5,
         "prob_victoria_local": p_local,
         "prob_empate": p_empate,
         "prob_victoria_visita": p_visita,
@@ -154,6 +156,7 @@ def generar_predicciones_fase_grupos(estado: pd.DataFrame, modelo, rho: float) -
                 "prob_victoria_local": round(pred["prob_victoria_local"], 4),
                 "prob_empate": round(pred["prob_empate"], 4),
                 "prob_victoria_visita": round(pred["prob_victoria_visita"], 4),
+                "prob_over_0_5": round(pred["prob_over_0_5"], 4),
                 "marcador_mas_probable": marcador_top["marcador"],
                 "prob_marcador_mas_probable": round(marcador_top["probabilidad"], 4),
             })

@@ -54,7 +54,10 @@ def ejecutar_pipeline_fifa() -> tuple[bool, str | None]:
     recálculo de Elo/forma y nueva simulación Monte Carlo.
     Devuelve (ok, mensaje_error).
     """
-    for script in ["actualizar_resultados_fifa.py", "actualizar_estado_mundial.py", "simulate.py"]:
+    for script in [
+        "actualizar_resultados_fifa.py", "actualizar_estado_mundial.py",
+        "predecir_eliminatoria.py", "simulate.py",
+    ]:
         try:
             resultado = subprocess.run(
                 [sys.executable, str(SRC_DIR / script)],
@@ -332,7 +335,7 @@ with tab_grupos:
         "fecha", "jornada", "grupo",
         "bandera_local", "equipo_local", "bandera_visita", "equipo_visita",
         "goles_esperados_local", "goles_esperados_visita", "goles_esperados_total",
-        "prob_victoria_local", "prob_empate", "prob_victoria_visita",
+        "prob_victoria_local", "prob_empate", "prob_victoria_visita", "prob_over_0_5",
         "marcador_mas_probable", "prediccion_modelo",
         "resultado_real", "acierto",
         "marcador_real", "acierto_marcador",
@@ -346,6 +349,7 @@ with tab_grupos:
         "goles_esperados_local": "xG Local", "goles_esperados_visita": "xG Visita",
         "goles_esperados_total": "xG Total",
         "prob_victoria_local": "P(Local)", "prob_empate": "P(Empate)", "prob_victoria_visita": "P(Visita)",
+        "prob_over_0_5": "P(Over 0.5)",
         "marcador_mas_probable": "Marcador más probable", "prediccion_modelo": "Predicción modelo",
         "resultado_real": "Resultado real", "acierto": "¿Acierto V/E/D?",
         "marcador_real": "Marcador real", "acierto_marcador": "¿Acierto marcador?",
@@ -357,6 +361,7 @@ with tab_grupos:
         tabla_mostrar.style.format({
             "xG Local": "{:.2f}", "xG Visita": "{:.2f}", "xG Total": "{:.2f}",
             "P(Local)": "{:.1%}", "P(Empate)": "{:.1%}", "P(Visita)": "{:.1%}",
+            "P(Over 0.5)": "{:.1%}",
             "Total goles real": "{:.0f}",
         }, na_rep=""),
         column_config={
@@ -374,17 +379,10 @@ with tab_final:
 
     st.subheader("Tablas de posiciones por grupo (en vivo)")
 
-    primeros, segundos, terceros, grupos_completos = {}, {}, {}, {}
     cols = st.columns(4)
-
     for i, g in enumerate(GRUPOS):
         df_grupo = df[df["grupo"] == g]
-        tabla_g, completo = calcular_tabla_grupo(equipos_por_grupo[g], df_grupo)
-        grupos_completos[g] = completo
-
-        primeros[g] = tabla_g.iloc[0]["seleccion"] if completo else f"1° Grupo {g}"
-        segundos[g] = tabla_g.iloc[1]["seleccion"] if completo else f"2° Grupo {g}"
-        terceros[g] = tabla_g.iloc[2] if completo else None
+        tabla_g, _ = calcular_tabla_grupo(equipos_por_grupo[g], df_grupo)
 
         with cols[i % 4]:
             st.markdown(f"**Grupo {g}**")
@@ -398,44 +396,65 @@ with tab_final:
             )
 
     st.divider()
-    st.subheader("Cuadro de dieciseisavos de final")
+    st.subheader("Fase eliminatoria")
 
-    todos_completos = all(grupos_completos.values())
+    RUTA_ELIMINATORIA = DATA_DIR / "calendario_eliminatoria.csv"
+    ORDEN_RONDAS = [
+        "Dieciseisavos de final", "Octavos de final", "Cuartos de final",
+        "Semifinal", "Tercer puesto", "Final",
+    ]
 
-    if todos_completos:
-        ranking_terceros = sorted(
-            [(g, terceros[g]) for g in GRUPOS],
-            key=lambda x: (x[1]["PTS"], x[1]["DG"], x[1]["GF"]),
-            reverse=True,
+    if RUTA_ELIMINATORIA.exists():
+        eliminatoria = pd.read_csv(RUTA_ELIMINATORIA, parse_dates=["fecha"])
+        eliminatoria["goles_esperados_total"] = (
+            eliminatoria["goles_esperados_local"] + eliminatoria["goles_esperados_visita"]
         )
-        mejores_terceros = [g for g, _ in ranking_terceros[:8]]
-        terceros_clasificados = [terceros[g]["seleccion"] for g in mejores_terceros]
+        eliminatoria["bandera_local"] = eliminatoria["equipo_local"].map(bandera)
+        eliminatoria["bandera_visita"] = eliminatoria["equipo_visita"].map(bandera)
+
+        st.caption(
+            "Cuadro real publicado por FIFA (no es un cruce estimado): los nombres de "
+            "dieciseisavos aparecen en cuanto termina la fase de grupos; las rondas "
+            "siguientes muestran 'Ganador Partido N' hasta que ese partido se juegue."
+        )
+
+        columnas_elim = [
+            "fecha", "bandera_local", "equipo_local", "bandera_visita", "equipo_visita",
+            "goles_esperados_local", "goles_esperados_visita", "goles_esperados_total",
+            "prob_victoria_local", "prob_empate", "prob_victoria_visita", "prob_over_0_5",
+            "marcador_mas_probable", "goles_local_real", "goles_visita_real",
+        ]
+        nombres_elim = {
+            "fecha": "Fecha", "bandera_local": "🏳️ L", "equipo_local": "Local",
+            "bandera_visita": "🏳️ V", "equipo_visita": "Visita",
+            "goles_esperados_local": "xG Local", "goles_esperados_visita": "xG Visita",
+            "goles_esperados_total": "xG Total",
+            "prob_victoria_local": "P(Local)", "prob_empate": "P(Empate)", "prob_victoria_visita": "P(Visita)",
+            "prob_over_0_5": "P(Over 0.5)", "marcador_mas_probable": "Marcador más probable",
+            "goles_local_real": "Goles Local (real)", "goles_visita_real": "Goles Visita (real)",
+        }
+
+        for ronda in ORDEN_RONDAS:
+            df_ronda = eliminatoria[eliminatoria["ronda"] == ronda].sort_values("match_number")
+            if df_ronda.empty:
+                continue
+
+            st.markdown(f"**{ronda}**")
+            tabla_ronda = df_ronda[columnas_elim].rename(columns=nombres_elim)
+            st.dataframe(
+                tabla_ronda.style.format({
+                    "xG Local": "{:.2f}", "xG Visita": "{:.2f}", "xG Total": "{:.2f}",
+                    "P(Local)": "{:.1%}", "P(Empate)": "{:.1%}", "P(Visita)": "{:.1%}", "P(Over 0.5)": "{:.1%}",
+                    "Goles Local (real)": "{:.0f}", "Goles Visita (real)": "{:.0f}",
+                }, na_rep=""),
+                column_config={
+                    "🏳️ L": st.column_config.ImageColumn("🏳️ L", width="small"),
+                    "🏳️ V": st.column_config.ImageColumn("🏳️ V", width="small"),
+                },
+                use_container_width=True, hide_index=True,
+            )
     else:
-        terceros_clasificados = [f"3° (Grupo {g})" for g in GRUPOS[:8]]
-
-    st.caption(
-        "Cruce simplificado (ver README): 1° de cada grupo vs 2° del grupo siguiente, "
-        "y los 8 mejores terceros emparejados tipo 'serpiente'. "
-        "Los nombres reales aparecen una vez que el grupo correspondiente esté completo."
-    )
-
-    bracket = []
-    for i, g in enumerate(GRUPOS):
-        g_siguiente = GRUPOS[(i + 1) % len(GRUPOS)]
-        bracket.append((primeros[g], segundos[g_siguiente]))
-
-    t = terceros_clasificados
-    for a, b in [(t[0], t[7]), (t[1], t[6]), (t[2], t[5]), (t[3], t[4])]:
-        bracket.append((a, b))
-
-    def linea_equipo(nombre: str) -> str:
-        url = bandera(nombre)
-        return f"![]({url}) {nombre}" if url else nombre
-
-    cols_bracket = st.columns(4)
-    for idx, (a, b) in enumerate(bracket):
-        with cols_bracket[idx % 4]:
-            st.info(f"**Partido {idx + 1}**\n\n{linea_equipo(a)}\n\nvs\n\n{linea_equipo(b)}")
+        st.info("El cuadro de eliminatoria todavía no está disponible. Se genera al terminar la fase de grupos.")
 
     st.divider()
     st.subheader("Probabilidades de la simulación Monte Carlo (10,000 torneos)")

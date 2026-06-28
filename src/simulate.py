@@ -39,6 +39,7 @@ RUTA_GRUPOS = DATA_DIR / "grupos_2026.csv"
 RUTA_ESTADO_ACTUAL = DATA_DIR / "estado_actual_selecciones.csv"
 RUTA_ESTADO_MUNDIAL = DATA_DIR / "estado_actual_mundial2026.csv"
 RUTA_RESULTADOS_REALES = DATA_DIR / "resultados_reales_grupos.csv"
+RUTA_ELIMINATORIA = DATA_DIR / "calendario_eliminatoria.csv"
 RUTA_MODELO = DATA_DIR / "modelo_goles.pickle"
 RUTA_RHO = DATA_DIR / "dixon_coles_rho.json"
 RUTA_SALIDA = OUTPUT_DIR / "resultados.csv"
@@ -81,8 +82,13 @@ def cargar_datos():
     equipos_por_grupo = {g: grupos_df.loc[grupos_df["grupo"] == g, "seleccion"].tolist() for g in GRUPOS}
 
     resultados_reales = cargar_resultados_reales()
+    bracket_real = cargar_bracket_real()
+    resultados_reales_eliminatoria = cargar_resultados_reales_eliminatoria()
 
-    return grupos_df, estado, modelo, rho, equipos_mundial, grupo_de, equipos_por_grupo, resultados_reales
+    return (
+        grupos_df, estado, modelo, rho, equipos_mundial, grupo_de, equipos_por_grupo,
+        resultados_reales, bracket_real, resultados_reales_eliminatoria,
+    )
 
 
 def cargar_resultados_reales() -> dict:
@@ -103,6 +109,49 @@ def cargar_resultados_reales() -> dict:
     return {
         (fila["grupo"], fila["equipo_local"], fila["equipo_visita"]): (int(fila["goles_local_real"]), int(fila["goles_visita_real"]))
         for _, fila in reales.iterrows()
+    }
+
+
+def cargar_bracket_real() -> list[str] | None:
+    """
+    Carga el cuadro real de dieciseisavos de final (16 partidos, 32 equipos)
+    tal como lo resuelve FIFA en cuanto termina la fase de grupos
+    (data/calendario_eliminatoria.csv, generado por actualizar_resultados_fifa.py).
+
+    Devuelve una lista de 32 equipos en orden de partido (pares consecutivos:
+    (0,1), (2,3), ...) o None si todavía no están definidos los 16 cruces
+    (en cuyo caso se usa el cuadro heurístico simplificado como aproximación).
+    """
+    if not RUTA_ELIMINATORIA.exists():
+        return None
+
+    df = pd.read_csv(RUTA_ELIMINATORIA)
+    r32 = df[df["ronda"] == "Dieciseisavos de final"].sort_values("match_number")
+    if len(r32) != 16 or not (r32["local_definido"] & r32["visita_definido"]).all():
+        return None
+
+    bracket = []
+    for _, fila in r32.iterrows():
+        bracket.append(fila["equipo_local"])
+        bracket.append(fila["equipo_visita"])
+    return bracket
+
+
+def cargar_resultados_reales_eliminatoria() -> dict:
+    """
+    Carga los partidos de la fase eliminatoria ya jugados en el Mundial real
+    (data/calendario_eliminatoria.csv). Se "fijan" en la simulación igual que
+    los resultados reales de grupos: no se vuelven a sortear.
+
+    Devuelve {(equipo_local, equipo_visita): (goles_local, goles_visita)}.
+    """
+    if not RUTA_ELIMINATORIA.exists():
+        return {}
+
+    df = pd.read_csv(RUTA_ELIMINATORIA).dropna(subset=["goles_local_real", "goles_visita_real"])
+    return {
+        (fila["equipo_local"], fila["equipo_visita"]): (int(fila["goles_local_real"]), int(fila["goles_visita_real"]))
+        for _, fila in df.iterrows()
     }
 
 
@@ -257,18 +306,27 @@ def construir_bracket(primeros: dict, segundos: dict, mejores_terceros: list[str
 
 
 def simular_eliminatoria(bracket: list[str], cumsum_por_par: dict, indices_marcador: list,
-                          elo: pd.Series, contadores: dict, rng: np.random.Generator) -> str:
+                          elo: pd.Series, contadores: dict, rng: np.random.Generator,
+                          resultados_reales_eliminatoria: dict | None = None) -> str:
     """
     Simula las 5 rondas de eliminación directa (dieciseisavos -> campeón).
+    Los partidos ya jugados en el Mundial real (`resultados_reales_eliminatoria`)
+    no se vuelven a sortear: se usa el marcador real.
     Incrementa, para cada ganador de ronda, el contador correspondiente en `contadores`.
     Devuelve el campeón.
     """
+    resultados_reales_eliminatoria = resultados_reales_eliminatoria or {}
     ronda_actual = bracket
     for logro in RONDAS_ELIMINATORIA:
         siguiente_ronda = []
         for i in range(0, len(ronda_actual), 2):
             a, b = ronda_actual[i], ronda_actual[i + 1]
-            gol_a, gol_b = jugar_partido(a, b, cumsum_por_par, indices_marcador, rng)
+            if (a, b) in resultados_reales_eliminatoria:
+                gol_a, gol_b = resultados_reales_eliminatoria[(a, b)]
+            elif (b, a) in resultados_reales_eliminatoria:
+                gol_b, gol_a = resultados_reales_eliminatoria[(b, a)]
+            else:
+                gol_a, gol_b = jugar_partido(a, b, cumsum_por_par, indices_marcador, rng)
 
             if gol_a > gol_b:
                 ganador = a
@@ -290,9 +348,11 @@ def simular_eliminatoria(bracket: list[str], cumsum_por_par: dict, indices_marca
 # ----------------------------------------------------------------------------
 def simular_torneo(n_simulaciones: int, equipos_mundial: list[str], equipos_por_grupo: dict,
                     cumsum_por_par: dict, indices_marcador: list, elo: pd.Series,
-                    resultados_reales: dict | None = None, seed: int = SEMILLA) -> dict:
+                    resultados_reales: dict | None = None, bracket_real: list[str] | None = None,
+                    resultados_reales_eliminatoria: dict | None = None, seed: int = SEMILLA) -> dict:
     rng = np.random.default_rng(seed)
     resultados_reales = resultados_reales or {}
+    resultados_reales_eliminatoria = resultados_reales_eliminatoria or {}
 
     # Partidos ya jugados en el Mundial real, agrupados por grupo:
     # {grupo: {(equipo_local, equipo_visita): (goles_local, goles_visita)}}
@@ -329,8 +389,10 @@ def simular_torneo(n_simulaciones: int, equipos_mundial: list[str], equipos_por_
         for e in mejores_terceros:
             contadores[e]["pasa_grupo"] += 1
 
-        bracket = construir_bracket(primeros, segundos, mejores_terceros)
-        simular_eliminatoria(bracket, cumsum_por_par, indices_marcador, elo, contadores, rng)
+        # Si FIFA ya publicó el cuadro real de dieciseisavos (fase de grupos
+        # terminada), se usa tal cual en vez del cruce heurístico simplificado.
+        bracket = bracket_real if bracket_real is not None else construir_bracket(primeros, segundos, mejores_terceros)
+        simular_eliminatoria(bracket, cumsum_por_par, indices_marcador, elo, contadores, rng, resultados_reales_eliminatoria)
 
     return contadores
 
@@ -340,9 +402,15 @@ def simular_torneo(n_simulaciones: int, equipos_mundial: list[str], equipos_por_
 # ----------------------------------------------------------------------------
 def main():
     print("Cargando datos (grupos, estado actual de selecciones, modelo y rho)...")
-    grupos_df, estado, modelo, rho, equipos_mundial, grupo_de, equipos_por_grupo, resultados_reales = cargar_datos()
+    (
+        grupos_df, estado, modelo, rho, equipos_mundial, grupo_de, equipos_por_grupo,
+        resultados_reales, bracket_real, resultados_reales_eliminatoria,
+    ) = cargar_datos()
     print(f"Selecciones: {len(equipos_mundial)} | Grupos: {len(GRUPOS)} | rho = {rho:.4f}")
     print(f"Partidos de grupos ya jugados (fijados en la simulación): {len(resultados_reales)}")
+    if bracket_real is not None:
+        print("Cuadro real de dieciseisavos (FIFA) disponible: se usa en vez del cruce heurístico.")
+    print(f"Partidos de eliminatoria ya jugados (fijados en la simulación): {len(resultados_reales_eliminatoria)}")
 
     print("Calculando goles esperados (lambda) para todos los enfrentamientos posibles...")
     lambdas = calcular_lambdas(equipos_mundial, estado, modelo)
@@ -354,7 +422,8 @@ def main():
 
     print(f"Simulando el torneo {N_SIMULACIONES:,} veces...")
     contadores = simular_torneo(
-        N_SIMULACIONES, equipos_mundial, equipos_por_grupo, cumsum_por_par, indices_marcador, elo, resultados_reales
+        N_SIMULACIONES, equipos_mundial, equipos_por_grupo, cumsum_por_par, indices_marcador, elo,
+        resultados_reales, bracket_real, resultados_reales_eliminatoria,
     )
 
     filas = []

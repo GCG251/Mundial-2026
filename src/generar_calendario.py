@@ -84,6 +84,7 @@ def main():
                     "prob_victoria_local": round(pred["prob_victoria_local"], 4),
                     "prob_empate": round(pred["prob_empate"], 4),
                     "prob_victoria_visita": round(pred["prob_victoria_visita"], 4),
+                    "prob_over_0_5": round(pred["prob_over_0_5"], 4),
                     "marcador_mas_probable": marcador_top["marcador"],
                 })
 

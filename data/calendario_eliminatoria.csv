@@ -1,0 +1,33 @@
+match_number,ronda,fecha,equipo_local,equipo_visita,local_definido,visita_definido,goles_local_real,goles_visita_real,goles_esperados_local,goles_esperados_visita,prob_victoria_local,prob_empate,prob_victoria_visita,prob_over_0_5,marcador_mas_probable,prob_marcador_mas_probable
+73,Dieciseisavos de final,2026-06-28,South Africa,Canada,True,True,,,0.7,1.79,0.138,0.2276,0.6343,0.9152,0-1,0.1467
+74,Dieciseisavos de final,2026-06-29,Germany,Paraguay,True,True,,,1.54,0.89,0.523,0.2618,0.2152,0.9091,1-0,0.134
+75,Dieciseisavos de final,2026-06-29,Netherlands,Morocco,True,True,,,1.16,1.11,0.3661,0.2906,0.3433,0.8944,1-1,0.1354
+76,Dieciseisavos de final,2026-06-29,Brazil,Japan,True,True,,,1.32,0.94,0.4496,0.2851,0.2653,0.8931,1-0,0.1352
+77,Dieciseisavos de final,2026-06-30,France,Sweden,True,True,,,2.38,0.65,0.7582,0.1602,0.0816,0.9501,2-0,0.1373
+78,Dieciseisavos de final,2026-06-30,Ivory Coast,Norway,True,True,,,1.08,1.28,0.3089,0.2823,0.4088,0.9032,1-1,0.1329
+79,Dieciseisavos de final,2026-06-30,Mexico,Ecuador,True,True,,,1.33,0.92,0.4608,0.284,0.2552,0.8924,1-0,0.138
+80,Dieciseisavos de final,2026-07-01,England,DR Congo,True,True,,,1.65,0.6,0.628,0.242,0.1299,0.8931,1-0,0.1716
+81,Dieciseisavos de final,2026-07-01,United States,Bosnia and Herzegovina,True,True,,,1.94,0.94,0.6059,0.2195,0.1746,0.9419,1-0,0.1073
+82,Dieciseisavos de final,2026-07-01,Belgium,Senegal,True,True,,,1.6,0.89,0.5399,0.2542,0.2059,0.9151,1-0,0.1306
+83,Dieciseisavos de final,2026-07-02,Portugal,Croatia,True,True,,,1.48,0.9,0.504,0.2682,0.2278,0.9051,1-0,0.1346
+84,Dieciseisavos de final,2026-07-02,Spain,Austria,True,True,,,1.83,0.69,0.6432,0.2233,0.1335,0.9175,1-0,0.1454
+85,Dieciseisavos de final,2026-07-02,Switzerland,Algeria,True,True,,,1.16,1.1,0.3714,0.2913,0.3373,0.8932,1-1,0.1355
+86,Dieciseisavos de final,2026-07-03,Argentina,Cape Verde,True,True,,,2.74,0.42,0.8556,0.1089,0.0355,0.9568,2-0,0.1592
+87,Dieciseisavos de final,2026-07-03,Colombia,Ghana,True,True,,,2.09,0.55,0.7337,0.1831,0.0832,0.9269,2-0,0.1563
+88,Dieciseisavos de final,2026-07-03,Australia,Egypt,True,True,,,1.01,0.96,0.3546,0.3169,0.3285,0.857,0-0,0.143
+89,Octavos de final,2026-07-04,Ganador Partido 74,Ganador Partido 77,False,False,,,,,,,,,,
+90,Octavos de final,2026-07-04,Ganador Partido 73,Ganador Partido 75,False,False,,,,,,,,,,
+91,Octavos de final,2026-07-05,Ganador Partido 76,Ganador Partido 78,False,False,,,,,,,,,,
+92,Octavos de final,2026-07-05,Ganador Partido 79,Ganador Partido 80,False,False,,,,,,,,,,
+93,Octavos de final,2026-07-06,Ganador Partido 83,Ganador Partido 84,False,False,,,,,,,,,,
+94,Octavos de final,2026-07-06,Ganador Partido 81,Ganador Partido 82,False,False,,,,,,,,,,
+95,Octavos de final,2026-07-07,Ganador Partido 86,Ganador Partido 88,False,False,,,,,,,,,,
+96,Octavos de final,2026-07-07,Ganador Partido 85,Ganador Partido 87,False,False,,,,,,,,,,
+97,Cuartos de final,2026-07-09,Ganador Partido 89,Ganador Partido 90,False,False,,,,,,,,,,
+98,Cuartos de final,2026-07-10,Ganador Partido 93,Ganador Partido 94,False,False,,,,,,,,,,
+99,Cuartos de final,2026-07-11,Ganador Partido 91,Ganador Partido 92,False,False,,,,,,,,,,
+100,Cuartos de final,2026-07-11,Ganador Partido 95,Ganador Partido 96,False,False,,,,,,,,,,
+101,Semifinal,2026-07-14,Ganador Partido 97,Ganador Partido 98,False,False,,,,,,,,,,
+102,Semifinal,2026-07-15,Ganador Partido 99,Ganador Partido 100,False,False,,,,,,,,,,
+103,Tercer puesto,2026-07-18,Perdedor Partido 101,Perdedor Partido 102,False,False,,,,,,,,,,
+104,Final,2026-07-19,Ganador Partido 101,Ganador Partido 102,False,False,,,,,,,,,,
