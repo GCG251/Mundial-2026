@@ -16,6 +16,7 @@ Proyecto Mundial 2026/
 │   ├── grupos_2026.csv     # Grupos oficiales del Mundial 2026 (lo provee el usuario)
 │   ├── calendario_grupos.csv # Calendario de fase de grupos + predicciones (generado)
 │   ├── resultados_reales_grupos.csv # Resultados reales (ingresados o desde FIFA.com)
+│   ├── calendario_eliminatoria.csv # Cuadro real de eliminatoria + predicciones (desde FIFA.com)
 │   ├── equipos_2026.csv     # Mapeo selección <-> nombre/código FIFA y bandera (ISO)
 │   ├── modelo_goles.pickle  # Modelo Poisson entrenado
 │   └── dixon_coles_rho.json # Parámetro rho del ajuste Dixon-Coles
@@ -25,8 +26,9 @@ Proyecto Mundial 2026/
 │   ├── simulate.py          # Simulación Monte Carlo del torneo
 │   ├── predecir_partido.py  # Predicción puntual de cualquier partido
 │   ├── generar_calendario.py # Genera el calendario de grupos con predicciones
+│   ├── predecir_eliminatoria.py # Predice los partidos de eliminatoria ya definidos
 │   ├── actualizar_estado_mundial.py # Actualiza Elo/forma con resultados reales del Mundial
-│   └── actualizar_resultados_fifa.py # Descarga fechas/resultados reales desde la API de FIFA.com
+│   └── actualizar_resultados_fifa.py # Descarga fechas/resultados/cuadro real desde la API de FIFA.com
 ├── notebooks/
 │   └── analisis.ipynb       # Visualización de resultados
 ├── output/
@@ -79,8 +81,11 @@ resultado real para calcular el **% de acierto** del modelo en tiempo real. Incl
 grupo, selección y fecha en la barra lateral.
 
 La pestaña "Fase final" muestra las tablas de posiciones de cada grupo calculadas en vivo a
-partir de los resultados ingresados, y el cuadro de dieciseisavos de final (con placeholders
-hasta que los grupos correspondientes estén completos).
+partir de los resultados ingresados, y el cuadro real de la fase eliminatoria (dieciseisavos
+en adelante) tal como lo publica FIFA: los cruces de dieciseisavos muestran los equipos reales
+en cuanto termina la fase de grupos, y las rondas siguientes muestran "Ganador Partido N" hasta
+que ese partido se dispute. Cada partido con ambos equipos definidos incluye su predicción
+(goles esperados, P(V/E/D), P(Over 0.5), marcador más probable).
 
 ### Banderas
 
@@ -93,8 +98,9 @@ El botón **"🔄 Actualizar resultados desde FIFA.com"** en la barra lateral de
 ejecuta automáticamente, en orden:
 
 ```powershell
-python src/actualizar_resultados_fifa.py   # descarga fechas y marcadores reales
+python src/actualizar_resultados_fifa.py   # descarga fechas, marcadores y el cuadro de eliminatoria
 python src/actualizar_estado_mundial.py    # recalcula Elo/forma con esos resultados
+python src/predecir_eliminatoria.py        # predice los partidos de eliminatoria ya definidos
 python src/simulate.py                     # vuelve a simular el torneo
 ```
 
@@ -102,7 +108,11 @@ python src/simulate.py                     # vuelve a simular el torneo
 (`api.fifa.com/api/v3/calendar/matches`) para el Mundial 2026, sincroniza las fechas
 reales en `data/calendario_grupos.csv` y guarda los marcadores de los partidos ya
 jugados en `data/resultados_reales_grupos.csv`, con el mismo formato que si se
-ingresaran manualmente desde el dashboard.
+ingresaran manualmente desde el dashboard. También guarda en
+`data/calendario_eliminatoria.csv` el cuadro real de dieciseisavos en adelante: FIFA
+resuelve los nombres reales de los equipos de dieciseisavos en cuanto termina la fase
+de grupos (usando el campo `PlaceHolderA`/`PlaceHolderB` de su API), por lo que no es
+necesario adivinar el cruce con un cuadro simplificado.
 
 Nota: en esta máquina la verificación del certificado TLS de `api.fifa.com` falla
 (interferencia de antivirus/firewall local), por lo que el script usa `verify=False`
